@@ -5,6 +5,8 @@ on:
     branches: [main]
     tags: ['v*']
   pull_request:
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       release_tag:
@@ -160,3 +162,4 @@ jobs:
           printf '{"projectId":"%s","tag":"%s","workflowRun":"%s"}\n' "$CF_PROJECT_ID" "$RELEASE_TAG" "$GITHUB_RUN_ID" > "$receipt"
           gh release upload "$RELEASE_TAG" "$receipt"
           echo "Uploaded $RELEASE_TAG to CurseForge project $CF_PROJECT_ID." >> "$GITHUB_STEP_SUMMARY"
+
