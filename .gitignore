@@ -1,0 +1,13 @@
+.release/
+.test-fixtures/
+__pycache__/
+*.pyc
+.env
+.env.*
+SavedVariables/
+WTF/
+VirtuousCompanion_Data/
+Data.lua
+*.lua.bak
+*.zip
+*.log

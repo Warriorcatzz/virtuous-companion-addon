@@ -1,0 +1,7 @@
+* text=auto
+*.lua text eol=lf
+*.toc text eol=lf
+*.sh text eol=lf
+*.py text eol=lf
+*.yml text eol=lf
+.pkgmeta text eol=lf

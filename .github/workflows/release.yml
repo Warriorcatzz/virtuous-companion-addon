@@ -1,0 +1,162 @@
+name: Check and release addon
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing version tag to publish or retry (leave empty to run checks only)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: addon-${{ inputs.release_tag || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.identity.outputs.release_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.release_tag || github.ref }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - id: identity
+        name: Validate release identity
+        env:
+          REQUESTED_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          tag="$REQUESTED_TAG"
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then tag="${GITHUB_REF#refs/tags/}"; fi
+          if [[ -n "$tag" ]]; then
+            python scripts/validate-release.py "$tag"
+            echo "release_tag=$tag" >> "$GITHUB_OUTPUT"
+          fi
+          # BigWigs intentionally skips a branch build when HEAD also has a tag.
+          # The tag run handles packaging; still run all checks on the branch push.
+          package=true
+          if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF" == refs/heads/* ]] && [[ -n "$(git tag --points-at HEAD)" ]]; then package=false; fi
+          echo "package=$package" >> "$GITHUB_OUTPUT"
+      - name: Install Lua 5.1
+        run: sudo apt-get update -qq && sudo apt-get install -y lua5.1
+      - name: Check Lua syntax and addon behaviour
+        run: bash scripts/test.sh
+      - name: Check release-package safeguards
+        run: python -m unittest discover -s tests -p '*_test.py'
+      - name: Build addon without publishing credentials
+        if: steps.identity.outputs.package == 'true'
+        uses: BigWigsMods/packager@01e8631a69c69d7654c788d152630d5fed9e3812 # v2.7.0, includes Forever support
+        with:
+          args: -d -l
+          pandoc: 'false'
+      - name: Inspect distributable ZIP
+        if: steps.identity.outputs.package == 'true'
+        run: python scripts/verify-package.py
+      - uses: actions/upload-artifact@v4
+        if: steps.identity.outputs.package == 'true'
+        with:
+          name: addon-package
+          path: .release/
+          include-hidden-files: true
+          if-no-files-found: error
+
+  github-release:
+    needs: check
+    if: needs.check.outputs.release_tag != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      RELEASE_TAG: ${{ needs.check.outputs.release_tag }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: addon-package
+          path: .release
+      - name: Publish versioned GitHub download
+        run: |
+          set -euo pipefail
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            prerelease=()
+            if [[ "$RELEASE_TAG" == *-alpha.* || "$RELEASE_TAG" == *-beta.* ]]; then prerelease+=(--prerelease); fi
+            gh release create "$RELEASE_TAG" --verify-tag --title "Virtuous Companion $RELEASE_TAG" --notes-file .release/VirtuousCompanion/CHANGELOG.md "${prerelease[@]}"
+          fi
+          for archive in .release/*.zip; do
+            name=$(basename "$archive")
+            existing=$(gh release view "$RELEASE_TAG" --json assets --jq ".assets[] | select(.name == \"$name\") | .name")
+            if [[ -z "$existing" ]]; then gh release upload "$RELEASE_TAG" "$archive"; fi
+          done
+
+  curseforge:
+    needs: [check, github-release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      CF_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
+      RELEASE_TAG: ${{ needs.check.outputs.release_tag }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ needs.check.outputs.release_tag }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: addon-package
+          path: .release
+      - id: configuration
+        name: Check CurseForge connection
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$CF_PROJECT_ID" || -z "$CF_API_TOKEN" ]]; then
+            echo '::notice::CurseForge publishing is pending: add CURSEFORGE_PROJECT_ID and CF_API_TOKEN in repository settings.'
+            echo '### CurseForge publishing pending' >> "$GITHUB_STEP_SUMMARY"
+            echo 'The GitHub ZIP is published. Add repository variable `CURSEFORGE_PROJECT_ID` and repository secret `CF_API_TOKEN`, then rerun this workflow for the same version tag.' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [[ ! "$CF_PROJECT_ID" =~ ^[1-9][0-9]*$ ]]; then echo 'Invalid CurseForge project ID'; exit 1; fi
+          receipt="curseforge-$CF_PROJECT_ID.json"
+          existing=$(gh release view "$RELEASE_TAG" --json assets --jq ".assets[] | select(.name == \"$receipt\") | .name")
+          if [[ -n "$existing" ]]; then
+            echo 'This version was already uploaded to this CurseForge project.'
+            exit 0
+          fi
+          echo 'ready=true' >> "$GITHUB_OUTPUT"
+      - name: Recheck downloaded package
+        if: steps.configuration.outputs.ready == 'true'
+        run: python scripts/verify-package.py
+      - name: Upload tested addon to CurseForge
+        if: steps.configuration.outputs.ready == 'true'
+        uses: BigWigsMods/packager@01e8631a69c69d7654c788d152630d5fed9e3812 # v2.7.0
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+        with:
+          # Keep and reuse the verified package folder; publish only to CurseForge.
+          args: -c -o -l -p ${{ vars.CURSEFORGE_PROJECT_ID }}
+          pandoc: 'false'
+      - name: Record successful CurseForge upload
+        if: steps.configuration.outputs.ready == 'true'
+        run: |
+          set -euo pipefail
+          receipt="curseforge-$CF_PROJECT_ID.json"
+          printf '{"projectId":"%s","tag":"%s","workflowRun":"%s"}\n' "$CF_PROJECT_ID" "$RELEASE_TAG" "$GITHUB_RUN_ID" > "$receipt"
+          gh release upload "$RELEASE_TAG" "$receipt"
+          echo "Uploaded $RELEASE_TAG to CurseForge project $CF_PROJECT_ID." >> "$GITHUB_STEP_SUMMARY"

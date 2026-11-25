@@ -1,0 +1,10 @@
+package-as: VirtuousCompanion
+enable-nolib-creation: no
+ignore:
+  - tests
+  - scripts
+  - README.md
+  - SavedVariables
+  - WTF
+  - VirtuousCompanion_Data
+  - Data.lua
