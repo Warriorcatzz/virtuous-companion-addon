@@ -3,8 +3,10 @@ enable-nolib-creation: no
 ignore:
   - tests
   - scripts
+  - docs
   - README.md
   - SavedVariables
   - WTF
   - VirtuousCompanion_Data
   - Data.lua
+
