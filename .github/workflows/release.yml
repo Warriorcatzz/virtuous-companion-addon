@@ -109,7 +109,7 @@ jobs:
     permissions:
       contents: write
     env:
-      CF_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
+      CF_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID || '1831149' }}
       RELEASE_TAG: ${{ needs.check.outputs.release_tag }}
       GH_TOKEN: ${{ github.token }}
       GH_REPO: ${{ github.repository }}
@@ -129,9 +129,9 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -z "$CF_PROJECT_ID" || -z "$CF_API_TOKEN" ]]; then
-            echo '::notice::CurseForge publishing is pending: add CURSEFORGE_PROJECT_ID and CF_API_TOKEN in repository settings.'
+            echo '::notice::CurseForge publishing is pending: add repository secret CF_API_TOKEN in repository settings.'
             echo '### CurseForge publishing pending' >> "$GITHUB_STEP_SUMMARY"
-            echo 'The GitHub ZIP is published. Add repository variable `CURSEFORGE_PROJECT_ID` and repository secret `CF_API_TOKEN`, then rerun this workflow for the same version tag.' >> "$GITHUB_STEP_SUMMARY"
+            echo 'The GitHub ZIP is published. CurseForge project 1831149 is configured. Add repository secret `CF_API_TOKEN`, then rerun this workflow for the same version tag.' >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           if [[ ! "$CF_PROJECT_ID" =~ ^[1-9][0-9]*$ ]]; then echo 'Invalid CurseForge project ID'; exit 1; fi
@@ -152,7 +152,7 @@ jobs:
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
         with:
           # Keep and reuse the verified package folder; publish only to CurseForge.
-          args: -c -o -l -p ${{ vars.CURSEFORGE_PROJECT_ID }}
+          args: -c -o -l -p ${{ env.CF_PROJECT_ID }}
           pandoc: 'false'
       - name: Record successful CurseForge upload
         if: steps.configuration.outputs.ready == 'true'
@@ -162,4 +162,3 @@ jobs:
           printf '{"projectId":"%s","tag":"%s","workflowRun":"%s"}\n' "$CF_PROJECT_ID" "$RELEASE_TAG" "$GITHUB_RUN_ID" > "$receipt"
           gh release upload "$RELEASE_TAG" "$receipt"
           echo "Uploaded $RELEASE_TAG to CurseForge project $CF_PROJECT_ID." >> "$GITHUB_STEP_SUMMARY"
-

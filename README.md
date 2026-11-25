@@ -30,14 +30,16 @@ The workflow uses [BigWigs Packager v2.7.0](https://github.com/BigWigsMods/packa
 
 ### One-time CurseForge setup
 
-Create a CurseForge WoW addon project named **Virtuous Companion** for the Forever client. In this GitHub repository's **Settings → Secrets and variables → Actions**, add:
+The addon and release workflow are connected to **Virtuous Companion**, CurseForge project **1831149**, for the Forever client. In this GitHub repository's **Settings → Secrets and variables → Actions**, add:
 
 | Type | Name | Value |
 | --- | --- | --- |
-| Repository variable | `CURSEFORGE_PROJECT_ID` | The numeric ID shown on your CurseForge project page |
 | Repository secret | `CF_API_TOKEN` | An upload token generated at [CurseForge API tokens](https://www.curseforge.com/account/api-tokens) |
+| Optional repository variable | `CURSEFORGE_PROJECT_ID` | Overrides the configured project ID `1831149` |
 
-Enter the token directly in GitHub Secrets. It does not belong in source files or chat. Without both settings, GitHub releases still work and the workflow summary explicitly says CurseForge publishing is pending. To publish an existing tag after configuring them, open **Actions → Check and release addon → Run workflow**, enter that tag in `release_tag`, and run it. A successful upload is recorded on the GitHub release so normal retries skip publishing it again. Actual upload failures fail the job.
+Enter the token directly in GitHub Secrets. It does not belong in source files or chat. Without the token, GitHub releases still work and the workflow summary explicitly says CurseForge publishing is pending. To publish an existing tag after adding the token, open **Actions → Check and release addon → Run workflow**, enter that tag in `release_tag`, and run it. A successful upload is recorded on the GitHub release so normal retries skip publishing it again. Actual upload failures fail the job.
+
+On the CurseForge project's **Source** tab, set the source URL to `https://github.com/Warriorcatzz/virtuous-companion-addon`. This displays the GitHub link; automatic file uploads are handled by the release workflow above. The first uploaded addon file starts CurseForge's project moderation process.
 
 Only the main addon is distributed. The desktop-generated `VirtuousCompanion_Data` addon, SavedVariables, member data, credentials, tests and development files are excluded from the ZIP. CurseForge updates therefore leave the generated inbox in its separate folder.
 
@@ -71,4 +73,3 @@ The desktop application is intentionally only a secure transport helper. Guild w
 ## Tests
 
 On Linux, install Lua 5.1 and run `bash scripts/test.sh`. It syntax-checks the Lua files, downloads the unmodified Forever [SecureTemplates.lua](https://raw.githubusercontent.com/Gethe/wow-ui-source/c01a87b549bbc19e0f284c1616d18654c91297de/Interface/AddOns/Blizzard_FrameXML/SecureTemplates.lua) and corresponding XML at that pinned commit, then runs `tests/*.test.lua`. The fixtures live in ignored `.test-fixtures/`. Direct Lua test runs can set `VIRTUOUS_WOW_UI_FIXTURES` to that directory; the existing workspace cache in `../.tools` remains the fallback. Rank-changing commands are mocked; the tests never change a live guild rank.
-

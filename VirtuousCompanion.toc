@@ -4,6 +4,7 @@
 ## Notes: In-game tickets and guild synchronisation for Virtuous
 ## Author: Virtuous Guild
 ## Version: 0.8.5
+## X-Curse-Project-ID: 1831149
 ## OptionalDeps: VirtuousCompanion_Data
 ## SavedVariables: VirtuousAddonDB
 
