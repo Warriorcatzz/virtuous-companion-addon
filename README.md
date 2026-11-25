@@ -30,14 +30,14 @@ The workflow uses [BigWigs Packager v2.7.0](https://github.com/BigWigsMods/packa
 
 ### One-time CurseForge setup
 
-Create a CurseForge WoW addon project named **Virtuous Companion** for the Forever client. In this GitHub repository's **Settings â†’ Secrets and variables â†’ Actions**, add:
+Create a CurseForge WoW addon project named **Virtuous Companion** for the Forever client. In this GitHub repository's **Settings → Secrets and variables → Actions**, add:
 
 | Type | Name | Value |
 | --- | --- | --- |
 | Repository variable | `CURSEFORGE_PROJECT_ID` | The numeric ID shown on your CurseForge project page |
 | Repository secret | `CF_API_TOKEN` | An upload token generated at [CurseForge API tokens](https://www.curseforge.com/account/api-tokens) |
 
-Enter the token directly in GitHub Secrets. It does not belong in source files or chat. Without both settings, GitHub releases still work and the workflow summary explicitly says CurseForge publishing is pending. To publish an existing tag after configuring them, open **Actions â†’ Check and release addon â†’ Run workflow**, enter that tag in `release_tag`, and run it. A successful upload is recorded on the GitHub release so normal retries skip publishing it again. Actual upload failures fail the job.
+Enter the token directly in GitHub Secrets. It does not belong in source files or chat. Without both settings, GitHub releases still work and the workflow summary explicitly says CurseForge publishing is pending. To publish an existing tag after configuring them, open **Actions → Check and release addon → Run workflow**, enter that tag in `release_tag`, and run it. A successful upload is recorded on the GitHub release so normal retries skip publishing it again. Actual upload failures fail the job.
 
 Only the main addon is distributed. The desktop-generated `VirtuousCompanion_Data` addon, SavedVariables, member data, credentials, tests and development files are excluded from the ZIP. CurseForge updates therefore leave the generated inbox in its separate folder.
 
